@@ -1,0 +1,80 @@
+import socket
+import threading
+HOST = "0.0.0.0"
+PORT = 5000
+def handle_tcp_client(conn, addr):
+ print(f"[TCP] Connection established with {addr}")
+ try:
+ while True:
+ data = conn.recv(1024)
+ if not data:
+ break
+ message = data.decode()
+ print(f"[TCP] Received from {addr}: {message}")
+ conn.sendall(("ACK from server: " + message).encode())
+ finally:
+ conn.close()
+ print(f"[TCP] Connection closed with {addr}")
+def tcp_server():
+ s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+ s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+ s.bind((HOST, PORT))
+ s.listen(5)
+ print(f"[TCP] Server listening on port {PORT}")
+ while True:
+ conn, addr = s.accept()
+ t = threading.Thread(target=handle_tcp_client, args=(conn, addr),
+daemon=True)
+ t.start()
+def udp_server():
+ s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+ s.bind((HOST, PORT))
+ print(f"[UDP] Server listening on port {PORT}")
+ while True:
+ data, addr = s.recvfrom(1024)
+ message = data.decode()
+ print(f"[UDP] Received from {addr}: {message}")
+ s.sendto(("ACK from server: " + message).encode(), addr)
+
+  if __name__ == "__main__":
+ threading.Thread(target=tcp_server, daemon=True).start()
+ threading.Thread(target=udp_server, daemon=True).start()
+ input("Server running. Press Enter to stop.\n
+  6.2 Client Program (client.py)
+import socket
+import time
+client_id = input("Enter Client ID: ")
+server_ip = input("Enter Server IP Address: ")
+port = int(input("Enter Port Number: "))
+protocol = input("Select Protocol (TCP/UDP): ").strip().upper()
+if protocol == "TCP":
+ sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+ sock.settimeout(5)
+ sock.connect((server_ip, port)) # three-way handshake
+ print("Connection Status : CONNECTED (TCP)")
+else:
+ sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+ sock.settimeout(3)
+ print("Connection Status : CONNECTIONLESS (UDP)")
+while True:
+ text = input("Message Input (type exit to quit): ")
+ if text.lower() == "exit":
+ break
+ packet = f"{client_id}: {text}".encode()
+ start = time.perf_counter()
+ try:
+ if protocol == "TCP":
+ sock.sendall(packet)
+ reply = sock.recv(1024)
+ else:
+ sock.sendto(packet, (server_ip, port))
+ reply, _ = sock.recvfrom(1024)
+ end = time.perf_counter()
+ print("Message Received :", reply.decode())
+ print(f"Transmission Time : {(end - start) *  1000:.3f} ms")
+ print("Acknowledgment : RECEIVED")
+ except socket.timeout:
+ print("Acknowledgment : NOT RECEIVED (timeout / packet lost)")
+sock.close()
+if protocol == "TCP":
+ print("Connection Status : CLOSED")
